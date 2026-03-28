@@ -1,0 +1,48 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'aegis-backend/**'
+      - 'aegis-frontend/**'
+
+jobs:
+  deploy-backend:
+    if: contains(github.event.head_commit.modified, 'aegis-backend/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: 'Deploy Backend'
+        uses: 'google-github-actions/deploy-cloudrun@v2'
+        with:
+          service: 'aegis-backend'
+          region: 'us-central1'
+          source: './aegis-backend'
+          env_vars: |
+            GOOGLE_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}
+            GOOGLE_LOCATION=us-central1
+
+  deploy-frontend:
+    if: contains(github.event.head_commit.modified, 'aegis-frontend/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: 'Deploy Frontend'
+        uses: 'google-github-actions/deploy-cloudrun@v2'
+        with:
+          service: 'aegis-frontend'
+          region: 'us-central1'
+          source: './aegis-frontend'
