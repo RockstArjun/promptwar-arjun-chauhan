@@ -1,25 +1,50 @@
 import 'dotenv/config.js';
 import express from "express";
 import cors from "cors";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const helmet = require("helmet");
+const { rateLimit } = require("express-rate-limit");
+
 import { TextProcessor } from "./infrastructure/processors/TextProcessor.js";
 import { AudioProcessor } from "./infrastructure/processors/AudioProcessor.js";
 import { ImageProcessor } from "./infrastructure/processors/ImageProcessor.js";
 import { GeminiService } from "./infrastructure/services/GeminiService.js";
+import { MapsService } from "./infrastructure/services/MapsService.js";
 import { DispatchOrchestratorFacade } from "./application/DispatchOrchestratorFacade.js";
 import { Storage } from '@google-cloud/storage';
 
 const app = express();
+
+/** 
+ * SECURITY MIDDLEWARE
+ * Helmet: Sets HTTP security headers to protect against XSS and injection
+ * Rate Limiter: Prevents API abuse and DDOS on extreme emergencies
+ */
+app.use(helmet());
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per window
+  message: { error: "Too many requests from this IP, please try again after 15 minutes" }
+});
+app.use("/api/", apiLimiter);
+
+// General Middleware
 app.use(cors());
 app.use(express.json());
 
-// Dependency Injection (Manual for Hackathon speed)
+/**
+ * CORE DISPATCH ORCHESTRATOR
+ * Injecting concrete implementations into the Facade to fulfill SOLID principles.
+ */
 const processors = {
   text: new TextProcessor(),
   audio: new AudioProcessor(),
   image: new ImageProcessor()
 };
 const geminiService = new GeminiService();
-const orchestrator = new DispatchOrchestratorFacade(processors, geminiService);
+const mapsService = new MapsService();
+const orchestrator = new DispatchOrchestratorFacade(processors, geminiService, mapsService);
 
 const storageOptions = process.env.GCP_SA_JSON 
   ? { credentials: JSON.parse(process.env.GCP_SA_JSON) } 
@@ -37,6 +62,10 @@ app.get("/", (req, res) => {
   `);
 });
 
+/**
+ * @route POST /api/report
+ * @desc Ingests incident data, passes through strategy, routes to Vertex AI, computes maps, and returns.
+ */
 app.post("/api/report", async (req, res) => {
   try {
     const result = await orchestrator.handle(req.body);
@@ -47,16 +76,23 @@ app.post("/api/report", async (req, res) => {
   }
 });
 
+/**
+ * @route POST /api/upload-url
+ * @desc Generates a secure Edge Upload portal for Civilian devices to bypass Backend I/O limits.
+ */
 app.post("/api/upload-url", async (req, res) => {
   try {
     const { fileName, contentType } = req.body;
     if (!fileName) return res.status(400).json({ error: "Missing fileName" });
 
+    // Ensure strict file types to prevent malformed injections
+    const sanitizeContentType = contentType && typeof contentType === 'string' ? contentType : 'application/octet-stream';
+
     const [url] = await bucket.file(fileName).getSignedUrl({
       version: 'v4',
       action: 'write',
-      expires: Date.now() + 15 * 60 * 1000, // 15 mins
-      contentType: contentType || 'application/octet-stream',
+      expires: Date.now() + 15 * 60 * 1000,
+      contentType: sanitizeContentType,
     });
 
     res.json({ 

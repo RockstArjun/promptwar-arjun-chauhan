@@ -1,52 +1,46 @@
-import { IEmergencyInputProcessor, ProcessedData } from "../domain/IEmergencyInputProcessor.js";
+import { IEmergencyInputProcessor } from "../domain/IEmergencyInputProcessor.js";
 import { IGeminiService } from "../infrastructure/services/GeminiService.js";
-import { PIIScrubber } from "../infrastructure/security/PIIScrubber.js";
+import { IMapsService } from "../infrastructure/services/MapsService.js";
 
 export class DispatchOrchestratorFacade {
   constructor(
-    private readonly processors: Record<string, IEmergencyInputProcessor>,
-    private readonly geminiService: IGeminiService
+    private processors: Record<string, IEmergencyInputProcessor>,
+    private geminiService: IGeminiService,
+    private mapsService: IMapsService
   ) {}
 
-  public async handle(payload: any): Promise<any> {
-    console.log("[Aegis] Ingesting Human Chaos...");
-    
-    let type = "text";
-    if (payload.audioUri) type = "audio";
-    else if (payload.imageUri) type = "image";
+  async handle(payload: any) {
+    let textToProcess = "";
+    let mediaUri: string | undefined = undefined;
 
-    const processor = this.processors[type];
-    if (!processor) {
-        throw new Error(`Unsupported input type: ${type}`);
-    }
-
-    // 1. Process Raw Input (Strategy Pattern)
-    const initialData = await processor.process(payload);
-    
-    // 2. Security (Double check PII Scrubbing)
-    const contentToTriage = type === 'text' 
-      ? PIIScrubber.scrub(initialData.rawTranscription || "") 
-      : initialData.rawTranscription || "";
-    
-    // 3. Intelligence (Gemini Triage)
-    let triageResult;
-    if (type === 'text') {
-        triageResult = await this.geminiService.triage(contentToTriage);
+    // 1. Strategy Routing based on Payload Profile
+    if (payload.imageUri) {
+      const processor = this.processors['image'];
+      const result = await processor.process(payload);
+      textToProcess = "";
+      mediaUri = result.rawTranscription; // Contains the GCS URI
+    } else if (payload.audioUri) {
+      const processor = this.processors['audio'];
+      const result = await processor.process(payload);
+      textToProcess = "";
+      mediaUri = result.rawTranscription;
     } else {
-        triageResult = await this.geminiService.triage("Analyze this emergency media", contentToTriage);
+      const processor = this.processors['text'];
+      const result = await processor.process(payload);
+      textToProcess = result.rawTranscription || "";
     }
-    
-    // 4. Action (Dispatch - Mocked for now)
-    console.log(`[Aegis] Dispatching: ${triageResult.incidentType} | Severity: ${triageResult.severity}`);
-    
+
+    // 2. Multimodal Intelligence Layer (Triage via Vertex AI)
+    const triage = await this.geminiService.triage(textToProcess, mediaUri);
+
+    // 3. Action Loop (Google Maps ETA Generation)
+    const routeEta = await this.mapsService.calculateETA(payload.location || null, triage.locationContext);
+
     return {
-      status: "DISPATCHED",
-      eta: "4 mins",
-      triage: triageResult,
-      servicePayload: {
-        units: triageResult.medicalResponse,
-        priority: triageResult.severity >= 4 ? "HIGH" : "NORMAL"
-      }
+      status: "dispatched",
+      eta: routeEta,
+      triage: triage,
+      timestamp: new Date().toISOString()
     };
   }
 }
