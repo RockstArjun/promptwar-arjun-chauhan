@@ -10,12 +10,12 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
   "dependencies": {
-    "@google-cloud/storage": "^7.15.2",
-    "@google-cloud/vertexai": "^1.9.3",
+    "@google-cloud/storage": "^7.19.0",
+    "@google-cloud/vertexai": "^1.10.3",
     "@googlemaps/google-maps-services-js": "^3.4.0",
     "axios": "^1.8.1",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
     "express": "^4.21.2"
   },
   "devDependencies": {
