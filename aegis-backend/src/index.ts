@@ -5,6 +5,7 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const helmet = require("helmet");
 const { rateLimit } = require("express-rate-limit");
+const compression = require("compression");
 
 import { TextProcessor } from "./infrastructure/processors/TextProcessor.js";
 import { AudioProcessor } from "./infrastructure/processors/AudioProcessor.js";
@@ -17,11 +18,21 @@ import { Storage } from '@google-cloud/storage';
 const app = express();
 
 /** 
- * SECURITY MIDDLEWARE
+ * CRITICAL FIX: CORS Middleware MUST BE DECLARED FIRST!
+ * Otherwise, the RateLimiter and Helmet will block Preflight OPTIONS requests, causing browser CORS crashes.
+ */
+app.use(cors());
+
+/** 
+ * SECURITY & EFFICIENCY MIDDLEWARE
  * Helmet: Sets HTTP security headers to protect against XSS and injection
- * Rate Limiter: Prevents API abuse and DDOS on extreme emergencies
+ * Compression: GZIP compresses heavily-loaded JSON payloads for maximum metric efficiency
  */
 app.use(helmet());
+app.use(compression());
+app.use(express.json());
+
+// Rate Limiter: Prevents API abuse and DDOS on extreme emergencies
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // Limit each IP to 100 requests per window
@@ -29,13 +40,9 @@ const apiLimiter = rateLimit({
 });
 app.use("/api/", apiLimiter);
 
-// General Middleware
-app.use(cors());
-app.use(express.json());
 
 /**
  * CORE DISPATCH ORCHESTRATOR
- * Injecting concrete implementations into the Facade to fulfill SOLID principles.
  */
 const processors = {
   text: new TextProcessor(),
