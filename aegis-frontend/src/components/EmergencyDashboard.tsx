@@ -21,7 +21,10 @@ const EmergencyDashboard: React.FC = () => {
   }, []);
 
   const getApiUrl = () => {
-    return import.meta.env.DEV ? 'http://localhost:3001' : (import.meta.env.VITE_API_URL || '');
+    // Injecting explicit backend Cloud Run URL for production environment
+    return import.meta.env.DEV 
+      ? 'http://localhost:3001' 
+      : (import.meta.env.VITE_API_URL || 'https://aegis-backend-1020240605059.europe-west1.run.app');
   };
 
   const uploadToGCS = async (file: File): Promise<string> => {
