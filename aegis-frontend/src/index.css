@@ -1,0 +1,41 @@
+:root {
+  --bg-primary: #000000;
+  --accent-yellow: #FFFF00;
+  --accent-red: #FF0000;
+  --text-primary: #FFFFFF;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  text-align: center;
+}
+
+button.panic-button {
+  background-color: var(--accent-red);
+  color: white;
+  border: none;
+  font-size: 2.5rem;
+  font-weight: 800;
+  padding: 40px 60px;
+  border-radius: 20px;
+  cursor: pointer;
+  box-shadow: 0 0 30px rgba(255, 0, 0, 0.4);
+  transition: transform 0.2s, box-shadow 0.2s;
+  width: 100%;
+  max-width: 400px;
+  margin-bottom: 30px;
+}
